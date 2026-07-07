@@ -2,25 +2,23 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 
 import '../../../core/router/app_router.dart';
-import '../../../core/services/prefs_service.dart';
 import '../../../core/theme/app_colors.dart';
 
 /// Animated Lottie pulse intro shown right after the native splash.
 /// Hands off to onboarding on first run, otherwise straight to home.
-class IntroScreen extends ConsumerStatefulWidget {
+class IntroScreen extends StatefulWidget {
   const IntroScreen({super.key});
 
   @override
-  ConsumerState<IntroScreen> createState() => _IntroScreenState();
+  State<IntroScreen> createState() => _IntroScreenState();
 }
 
-class _IntroScreenState extends ConsumerState<IntroScreen> {
+class _IntroScreenState extends State<IntroScreen> {
   Timer? _timer;
 
   @override
@@ -43,8 +41,8 @@ class _IntroScreenState extends ConsumerState<IntroScreen> {
 
   void _continue() {
     if (!mounted) return;
-    final onboarded = ref.read(prefsServiceProvider).onboardingComplete;
-    context.go(onboarded ? Routes.home : Routes.onboarding);
+    // The router's redirect sends us to onboarding, auth, or home.
+    context.go(Routes.home);
   }
 
   @override

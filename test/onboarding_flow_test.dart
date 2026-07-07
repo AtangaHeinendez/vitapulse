@@ -3,13 +3,26 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapulse/core/services/prefs_service.dart';
+import 'package:vitapulse/features/auth/application/auth_providers.dart';
+import 'package:vitapulse/features/auth/presentation/sign_in_screen.dart';
 import 'package:vitapulse/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:vitapulse/features/profile/application/profile_providers.dart';
 import 'package:vitapulse/main.dart';
 
-Future<Widget> _appWithPrefs() async {
+import 'fakes.dart';
+
+Future<Widget> appWithFakes({
+  FakeAuthRepository? auth,
+  FakeProfileRepository? profiles,
+}) async {
   final prefs = await SharedPreferences.getInstance();
   return ProviderScope(
-    overrides: [sharedPrefsProvider.overrideWithValue(prefs)],
+    overrides: [
+      sharedPrefsProvider.overrideWithValue(prefs),
+      authRepositoryProvider.overrideWithValue(auth ?? FakeAuthRepository()),
+      profileRepositoryProvider
+          .overrideWithValue(profiles ?? FakeProfileRepository()),
+    ],
     child: const VitaPulseApp(),
   );
 }
@@ -19,11 +32,11 @@ void main() {
 
   testWidgets('intro navigates to onboarding on first run', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(await _appWithPrefs());
+    await tester.pumpWidget(await appWithFakes());
+    await tester.pump(); // let the async router redirect resolve
 
     expect(find.text('VitaPulse'), findsOneWidget);
 
-    // Let the intro timer fire and the fade transition complete.
     await tester.pump(const Duration(milliseconds: 1800));
     await tester.pump(const Duration(milliseconds: 500));
 
@@ -31,25 +44,21 @@ void main() {
     await tester.pumpAndSettle(const Duration(seconds: 1));
   });
 
-  testWidgets('onboarding pages advance and Get started completes',
-      (tester) async {
+  testWidgets('onboarding completes into the sign-in screen', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(await _appWithPrefs());
+    await tester.pumpWidget(await appWithFakes());
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 1800));
     await tester.pumpAndSettle(const Duration(seconds: 1));
 
-    expect(find.text('Next'), findsOneWidget);
     await tester.tap(find.text('Next'));
     await tester.pumpAndSettle(const Duration(seconds: 1));
-
     await tester.tap(find.text('Next'));
     await tester.pumpAndSettle(const Duration(seconds: 1));
-
-    expect(find.text('Get started'), findsOneWidget);
     await tester.tap(find.text('Get started'));
     await tester.pumpAndSettle(const Duration(seconds: 1));
 
-    expect(find.text('Welcome to VitaPulse'), findsOneWidget);
+    expect(find.byType(SignInScreen), findsOneWidget);
 
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getBool('onboarding_complete'), isTrue);
@@ -57,10 +66,11 @@ void main() {
 
   testWidgets('intro skips onboarding when already completed', (tester) async {
     SharedPreferences.setMockInitialValues({'onboarding_complete': true});
-    await tester.pumpWidget(await _appWithPrefs());
+    await tester.pumpWidget(await appWithFakes());
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 1800));
     await tester.pumpAndSettle(const Duration(seconds: 1));
 
-    expect(find.text('Welcome to VitaPulse'), findsOneWidget);
+    expect(find.byType(SignInScreen), findsOneWidget);
   });
 }

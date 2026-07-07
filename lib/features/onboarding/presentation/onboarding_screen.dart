@@ -83,6 +83,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   Future<void> _finish() async {
     await ref.read(prefsServiceProvider).setOnboardingComplete();
+    // Router redirect decides what comes next (auth or home).
     if (mounted) context.go(Routes.home);
   }
 
