@@ -55,3 +55,6 @@ firebase-service-account*.json
 # Gradle-side build output (root /build/ is the redirected main one)
 /android/build/
 .vercel
+
+# Vercel CLI local project link
+.vercel/
