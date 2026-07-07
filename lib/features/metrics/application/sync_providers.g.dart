@@ -141,7 +141,7 @@ final class LatestMetricsProvider
   }
 }
 
-String _$latestMetricsHash() => r'34af4066ecb49f8dc95d337d9b92098ac474afaf';
+String _$latestMetricsHash() => r'1cef664406bd4ae218faaf54ff750186e484d977';
 
 /// Orchestrates: Health Connect -> health_metrics -> daily_summaries.
 /// No-ops on web, where the dashboard only reads what the phone synced.
@@ -174,7 +174,7 @@ final class SyncControllerProvider
   SyncController create() => SyncController();
 }
 
-String _$syncControllerHash() => r'cd77dc9cab1ec7a72c46fcc798ff0f4d2ef93e2a';
+String _$syncControllerHash() => r'0bf538df70089caa304d07b6666f7fabf7c71538';
 
 /// Orchestrates: Health Connect -> health_metrics -> daily_summaries.
 /// No-ops on web, where the dashboard only reads what the phone synced.

@@ -9,10 +9,13 @@ import '../../features/auth/presentation/reset_password_screen.dart';
 import '../../features/auth/presentation/sign_in_screen.dart';
 import '../../features/auth/presentation/sign_up_screen.dart';
 import '../../features/dashboard/presentation/home_screen.dart';
+import '../../features/metrics/presentation/metric_detail_screen.dart';
 import '../../features/onboarding/presentation/intro_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/application/profile_providers.dart';
 import '../../features/profile/presentation/profile_setup_screen.dart';
+import '../../features/profile/presentation/settings_screen.dart';
+import '../../features/reminders/presentation/reminders_screen.dart';
 import '../services/prefs_service.dart';
 
 abstract final class Routes {
@@ -25,6 +28,8 @@ abstract final class Routes {
   static const resetPassword = '/auth/reset-password';
   static const profileSetup = '/profile-setup';
   static const home = '/home';
+  static const settings = '/settings';
+  static const reminders = '/reminders';
 }
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -106,6 +111,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: Routes.home,
         pageBuilder: (context, state) => _fadePage(state, const HomeScreen()),
+      ),
+      GoRoute(
+        path: '/metric/:key',
+        builder: (context, state) =>
+            MetricDetailScreen(metricKey: state.pathParameters['key']!),
+      ),
+      GoRoute(
+        path: Routes.settings,
+        builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: Routes.reminders,
+        builder: (context, state) => const RemindersScreen(),
       ),
     ],
   );

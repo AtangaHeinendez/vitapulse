@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/router/app_router.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../auth/application/auth_providers.dart';
 import '../../metrics/application/sync_providers.dart';
-import '../../metrics/domain/metric_sample.dart';
+import '../../metrics/domain/metric_type.dart';
 import '../../profile/application/profile_providers.dart';
+import '../../water/application/water_service.dart';
+import '../application/dashboard_providers.dart';
+import 'widgets/metric_card.dart';
+import 'widgets/steps_ring_card.dart';
 
-/// Phase 3 home: health-data connection + sync pipeline proof.
-/// The full dashboard (rings, cards, charts) lands in Phase 4.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -20,17 +23,21 @@ class HomeScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final profile = ref.watch(currentProfileProvider).value;
     final sync = ref.watch(syncControllerProvider);
+    final dash = ref.watch(dashboardDataProvider);
     final firstName = profile?.fullName?.split(' ').first ?? 'there';
 
     return Scaffold(
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () => ref.read(syncControllerProvider.notifier).syncNow(),
+          onRefresh: () async {
+            await ref.read(syncControllerProvider.notifier).syncNow();
+            ref.invalidate(dashboardDataProvider);
+          },
           child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                padding: const EdgeInsets.fromLTRB(24, 16, 16, 4),
                 sliver: SliverToBoxAdapter(
                   child: Row(
                     children: [
@@ -51,43 +58,259 @@ class HomeScreen extends ConsumerWidget {
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Sign out',
-                        onPressed: () =>
-                            ref.read(authRepositoryProvider).signOut(),
-                        icon: const Icon(Icons.logout_rounded),
+                        tooltip: 'Settings',
+                        onPressed: () => context.push(Routes.settings),
+                        icon: const Icon(Icons.settings_rounded),
                       ),
                     ],
                   ),
                 ),
               ),
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                sliver: SliverToBoxAdapter(
-                  child: sync.when(
-                    loading: () => const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
-                    error: (e, _) => _StatusCard(
-                      icon: Icons.error_outline_rounded,
-                      color: theme.colorScheme.error,
-                      title: 'Health data unavailable',
-                      body: '$e',
-                    ),
-                    data: (s) => s.connected
-                        ? _SyncedHeader(state: s)
-                        : _ConnectCard(available: s.available),
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+                sliver: SliverToBoxAdapter(child: _SyncStatusLine(sync: sync)),
+              ),
+              if (sync.value != null && !sync.value!.connected && !kMockHealth)
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                  sliver: SliverToBoxAdapter(
+                    child: _ConnectCard(
+                        available: sync.value?.available ?? false),
                   ),
                 ),
-              ),
-              const SliverPadding(
-                padding: EdgeInsets.fromLTRB(24, 16, 24, 24),
-                sliver: _LatestMetricsList(),
+              dash.when(
+                loading: () => const SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (e, _) => SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text('Could not load your dashboard: $e'),
+                  ),
+                ),
+                data: (d) => _DashboardBody(data: d),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+}
+
+class _DashboardBody extends ConsumerWidget {
+  const _DashboardBody({required this.data});
+
+  final DashboardData data;
+
+  String _fmtSleep(int? minutes) {
+    if (minutes == null || minutes == 0) return '—';
+    return '${minutes ~/ 60}h ${minutes % 60}m';
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reduceMotion = MediaQuery.of(context).disableAnimations;
+    final latest = data.latest;
+
+    final hr = latest[MetricType.heartRate];
+    final sys = latest[MetricType.bpSystolic];
+    final dia = latest[MetricType.bpDiastolic];
+    final spo2 = latest[MetricType.spo2];
+    final weight = latest[MetricType.weight];
+
+    String weightSub = 'Weight';
+    if (data.weightTrend.length >= 2) {
+      final delta = data.weightTrend.last - data.weightTrend.first;
+      final arrow = delta.abs() < .1 ? '→' : (delta > 0 ? '↑' : '↓');
+      weightSub = 'Weight $arrow ${delta.abs().toStringAsFixed(1)} kg / 30d';
+    }
+
+    final cards = <Widget>[
+      MetricCard(
+        accent: AppColors.heartRate,
+        icon: MetricType.heartRate.icon,
+        title: 'Heart rate',
+        subtitle: 'Heart rate',
+        value: hr == null ? '—' : hr.value.round().toString(),
+        unit: 'bpm',
+        heroTag: 'metric-heart_rate',
+        sparkline: data.heartRateSpark,
+        onTap: () => context.push('/metric/heart_rate'),
+      ),
+      MetricCard(
+        accent: AppColors.sleep,
+        icon: MetricType.sleepSession.icon,
+        title: 'Sleep',
+        subtitle: 'Last night',
+        value: _fmtSleep(data.lastNightSleepMinutes),
+        heroTag: 'metric-sleep_session',
+        onTap: () => context.push('/metric/sleep_session'),
+      ),
+      MetricCard(
+        accent: AppColors.bloodPressure,
+        icon: MetricType.bpSystolic.icon,
+        title: 'Blood pressure',
+        subtitle: 'Blood pressure',
+        value: sys == null || dia == null
+            ? '—'
+            : '${sys.value.round()}/${dia.value.round()}',
+        unit: 'mmHg',
+        heroTag: 'metric-blood_pressure',
+        onTap: () => context.push('/metric/blood_pressure'),
+      ),
+      MetricCard(
+        accent: AppColors.spo2,
+        icon: MetricType.spo2.icon,
+        title: 'SpO₂',
+        subtitle: 'Blood oxygen',
+        value: spo2 == null ? '—' : spo2.value.round().toString(),
+        unit: '%',
+        heroTag: 'metric-spo2',
+        onTap: () => context.push('/metric/spo2'),
+      ),
+      MetricCard(
+        accent: AppColors.water,
+        icon: MetricType.waterIntake.icon,
+        title: 'Water',
+        subtitle: 'of ${data.waterGoalMl} ml goal',
+        value: data.todayWaterMl.toString(),
+        unit: 'ml',
+        heroTag: 'metric-water_intake',
+        trailing: _QuickAddWater(),
+        onTap: () => context.push('/metric/water_intake'),
+      ),
+      MetricCard(
+        accent: AppColors.calories,
+        icon: MetricType.caloriesBurned.icon,
+        title: 'Calories',
+        subtitle: 'Burned today',
+        value: data.todayCalories == 0
+            ? '—'
+            : data.todayCalories.round().toString(),
+        unit: 'kcal',
+        heroTag: 'metric-calories_burned',
+        onTap: () => context.push('/metric/calories_burned'),
+      ),
+      MetricCard(
+        accent: AppColors.weight,
+        icon: MetricType.weight.icon,
+        title: 'Weight',
+        subtitle: weightSub,
+        value: weight == null ? '—' : weight.value.toStringAsFixed(1),
+        unit: 'kg',
+        heroTag: 'metric-weight',
+        onTap: () => context.push('/metric/weight'),
+      ),
+    ];
+
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(24, 4, 24, 28),
+      sliver: SliverList(
+        delegate: SliverChildListDelegate([
+          reduceMotion
+              ? StepsRingCard(
+                  steps: data.todaySteps,
+                  goal: data.stepGoal,
+                  onTap: () => context.push('/metric/steps'),
+                )
+              : StepsRingCard(
+                  steps: data.todaySteps,
+                  goal: data.stepGoal,
+                  onTap: () => context.push('/metric/steps'),
+                ).animate().fadeIn(duration: 400.ms).slideY(begin: .06),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 2,
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 14,
+              childAspectRatio: 1.08,
+            ),
+            itemCount: cards.length,
+            itemBuilder: (context, i) {
+              final card = cards[i];
+              if (reduceMotion) return card;
+              return card
+                  .animate(delay: (80 + 70 * i).ms)
+                  .fadeIn(duration: 380.ms)
+                  .slideY(begin: .1, curve: Curves.easeOutCubic);
+            },
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+class _QuickAddWater extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return SizedBox(
+      height: 34,
+      child: FilledButton.tonalIcon(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 34),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          backgroundColor: AppColors.water.withValues(alpha: .18),
+          foregroundColor: AppColors.water,
+          textStyle:
+              const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+        ),
+        onPressed: () async {
+          await ref.read(manualEntryServiceProvider).logWater(250);
+          if (context.mounted) {
+            ScaffoldMessenger.of(context)
+              ..clearSnackBars()
+              ..showSnackBar(
+                  const SnackBar(content: Text('+250 ml logged 💧')));
+          }
+        },
+        icon: const Icon(Icons.add_rounded, size: 16),
+        label: const Text('250'),
+      ),
+    );
+  }
+}
+
+class _SyncStatusLine extends StatelessWidget {
+  const _SyncStatusLine({required this.sync});
+
+  final AsyncValue<SyncState> sync;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final s = sync.value;
+    final text = switch (s) {
+      null => 'Checking health data…',
+      SyncState(connected: false) => 'Health data not connected',
+      SyncState(lastSyncedAt: null) => 'Connected — pull down to sync',
+      SyncState(:final lastSyncedAt?, :final lastSampleCount) =>
+        'Synced ${DateFormat.Hm().format(lastSyncedAt)} · '
+            '$lastSampleCount samples · pull to refresh',
+    };
+    return Row(
+      children: [
+        Icon(Icons.sync_rounded,
+            size: 16,
+            color: (s?.connected ?? false)
+                ? AppColors.teal
+                : theme.colorScheme.onSurface.withValues(alpha: .4)),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: .55),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -101,7 +324,7 @@ class _ConnectCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: theme.cardTheme.color,
         borderRadius: BorderRadius.circular(24),
@@ -113,248 +336,46 @@ class _ConnectCard extends ConsumerWidget {
           Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 42,
+                height: 42,
                 decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: AppColors.brandGradient,
                 ),
                 child: const Icon(Icons.favorite_rounded,
-                    color: Colors.white, size: 24),
+                    color: Colors.white, size: 22),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text('Connect your health data',
-                    style: theme.textTheme.titleLarge),
+                    style: theme.textTheme.titleMedium),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           Text(
             available
-                ? 'VitaPulse reads your steps, heart rate, sleep, SpO₂, blood '
-                    'pressure, weight and calories from Health Connect — where '
-                    'your Galaxy Watch data lands via Samsung Health. Your data '
-                    'stays in your own private database and is never shared.'
-                : 'Health Connect isn’t available on this device. Install it '
-                    'from the Play Store, then in Samsung Health enable '
-                    'Settings → Health Connect data sync.',
-            style: theme.textTheme.bodyMedium?.copyWith(
+                ? 'VitaPulse reads your watch data from Health Connect. It '
+                    'stays in your private database and is never shared.'
+                : 'Health Connect isn’t available here. Install it from the '
+                    'Play Store and enable Samsung Health → Settings → '
+                    'Health Connect data sync.',
+            style: theme.textTheme.bodySmall?.copyWith(
               height: 1.5,
-              color: theme.colorScheme.onSurface.withValues(alpha: .7),
+              color: theme.colorScheme.onSurface.withValues(alpha: .65),
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 12),
           FilledButton.icon(
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
             onPressed: available
-                ? () async {
-                    final ok = await ref
-                        .read(syncControllerProvider.notifier)
-                        .connect();
-                    if (!ok && context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                        content: Text(
-                            'Permission not granted — you can retry anytime.'),
-                      ));
-                    }
-                  }
+                ? () => ref.read(syncControllerProvider.notifier).connect()
                 : null,
-            icon: const Icon(Icons.link_rounded),
+            icon: const Icon(Icons.link_rounded, size: 18),
             label: const Text('Connect Health Connect'),
           ),
         ],
       ),
-    ).animate().fadeIn(duration: 400.ms).slideY(begin: .05);
-  }
-}
-
-class _SyncedHeader extends StatelessWidget {
-  const _SyncedHeader({required this.state});
-
-  final SyncState state;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final last = state.lastSyncedAt;
-    return Row(
-      children: [
-        Icon(Icons.sync_rounded, size: 18, color: AppColors.teal),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            last == null
-                ? 'Connected — pull down to sync'
-                : 'Synced ${DateFormat.Hm().format(last)} · '
-                    '${state.lastSampleCount} samples · pull to refresh',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withValues(alpha: .6),
-            ),
-          ),
-        ),
-      ],
     );
-  }
-}
-
-class _StatusCard extends StatelessWidget {
-  const _StatusCard({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.body,
-  });
-
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: theme.cardTheme.color,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: softShadow(context),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: color),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: theme.textTheme.titleMedium),
-                Text(body,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LatestMetricsList extends ConsumerWidget {
-  const _LatestMetricsList();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final latest = ref.watch(latestMetricsProvider);
-    return latest.when(
-      loading: () => const SliverToBoxAdapter(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      ),
-      error: (e, _) => SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text('Could not load metrics: $e'),
-        ),
-      ),
-      data: (samples) {
-        if (samples.isEmpty) {
-          return SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 32),
-              child: Center(
-                child: Text(
-                  'No data yet — connect and sync to see your metrics.',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: .5),
-                  ),
-                ),
-              ),
-            ),
-          );
-        }
-        return SliverList.separated(
-          itemCount: samples.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 10),
-          itemBuilder: (context, i) => _MetricTile(sample: samples[i], index: i),
-        );
-      },
-    );
-  }
-}
-
-class _MetricTile extends StatelessWidget {
-  const _MetricTile({required this.sample, required this.index});
-
-  final MetricSample sample;
-  final int index;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final t = sample.type;
-    final reduceMotion = MediaQuery.of(context).disableAnimations;
-    final tile = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: theme.cardTheme.color,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: softShadow(context),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: t.accent.withValues(alpha: .14),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(t.icon, color: t.accent, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(t.label, style: theme.textTheme.titleSmall),
-                Text(
-                  DateFormat.MMMd().add_Hm().format(sample.recordedAt),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: .5),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Text.rich(
-            TextSpan(
-              text: sample.value == sample.value.roundToDouble()
-                  ? sample.value.toInt().toString()
-                  : sample.value.toStringAsFixed(1),
-              style: theme.textTheme.titleLarge?.copyWith(color: t.accent),
-              children: [
-                TextSpan(
-                  text: ' ${t.unit}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: .5),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-    if (reduceMotion) return tile;
-    return tile
-        .animate(delay: (60 * index).ms)
-        .fadeIn(duration: 350.ms)
-        .slideY(begin: .08, curve: Curves.easeOutCubic);
   }
 }
