@@ -50,8 +50,14 @@ dart run flutter_launcher_icons                         # regen icons after conf
 flutter build web --release                             # web bundle (deployed to Vercel)
 ```
 
+## Machine-specific build workarounds (this dev machine)
+
+1. **Flutter SDK path has a space** (`C:\Users\Atanga Heinendez\develop\flutter`) which breaks Dart native-assets hooks (health→jni/objective_c). Always invoke Flutter via the junction: `C:\dev\flutter\bin\flutter.bat` (or put `C:\dev\flutter\bin` first in PATH).
+2. **AF_UNIX `connect` is broken on this Windows build** (26200.8737) — every JDK ≥16 `Selector.open()` dies, killing Gradle ("Unable to establish loopback connection"). Fixed via user env var `JAVA_TOOL_OPTIONS=-Djdk.net.unixdomain.tmpdir=<path longer than 108 bytes>` which forces the JDK's TCP-loopback pipe fallback. Delete the env var if a Windows update fixes AF_UNIX.
+3. **NDK pinned to 29.0.14206865** (root + app build.gradle.kts) because it's already installed; `flutter.ndkVersion` (28.2) triggers a multi-GB download that keeps failing on this connection. Don't "clean up" the pin.
+
 ## Status / decisions log
 
 - Phase 0: env audit clean (Flutter 3.44.5, Android SDK 36.1). gh/firebase/vercel CLIs deferred to Phases 5–6.
-- Phase 1: scaffold + design system + native splash → Lottie intro → 3-page onboarding. Onboarding-complete flag in SharedPreferences. Riverpod codegen deliberately deferred until Phase 2 (auth) — manual providers so far.
+- Phase 1 ✅: scaffold + design system + native splash → Lottie intro → 3-page onboarding, verified end-to-end on the Pixel_7 emulator (Android 16). Onboarding-complete flag in SharedPreferences. Riverpod codegen deliberately deferred until Phase 2 (auth) — manual providers so far. Core library desugaring enabled (flutter_local_notifications). Widget tests cover the first-run flow.
 - Supabase schema lives in `supabase/migrations/` (applied in Phase 2).
