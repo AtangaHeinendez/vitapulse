@@ -58,3 +58,6 @@ firebase-service-account*.json
 
 # Vercel CLI local project link
 .vercel/
+
+# Firebase service account key (never commit)
+firebase_service-account_key
