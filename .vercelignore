@@ -1,0 +1,7 @@
+# Upload only the prebuilt Flutter web bundle.
+/*
+!/build
+/build/*
+!/build/web
+!/vercel.json
+!/.vercelignore
