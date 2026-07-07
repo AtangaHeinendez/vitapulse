@@ -16,6 +16,7 @@ const kMockHealth = bool.fromEnvironment('MOCK_HEALTH');
 
 @Riverpod(keepAlive: true)
 HealthSource healthSource(Ref ref) {
+  if (kIsWeb) return NullHealthSource();
   if (kMockHealth) return MockHealthSource();
   return HealthConnectSource(ref.watch(sharedPrefsProvider));
 }

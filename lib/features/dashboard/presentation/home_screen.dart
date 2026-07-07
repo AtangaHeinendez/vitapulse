@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,10 +26,9 @@ class HomeScreen extends ConsumerWidget {
     final sync = ref.watch(syncControllerProvider);
     final dash = ref.watch(dashboardDataProvider);
     final firstName = profile?.fullName?.split(' ').first ?? 'there';
+    final isWide = MediaQuery.sizeOf(context).width >= 900;
 
-    return Scaffold(
-      body: SafeArea(
-        child: RefreshIndicator(
+    final content = RefreshIndicator(
           onRefresh: () async {
             await ref.read(syncControllerProvider.notifier).syncNow();
             ref.invalidate(dashboardDataProvider);
@@ -57,11 +57,12 @@ class HomeScreen extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      IconButton(
-                        tooltip: 'Settings',
-                        onPressed: () => context.push(Routes.settings),
-                        icon: const Icon(Icons.settings_rounded),
-                      ),
+                      if (!isWide)
+                        IconButton(
+                          tooltip: 'Settings',
+                          onPressed: () => context.push(Routes.settings),
+                          icon: const Icon(Icons.settings_rounded),
+                        ),
                     ],
                   ),
                 ),
@@ -70,7 +71,10 @@ class HomeScreen extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
                 sliver: SliverToBoxAdapter(child: _SyncStatusLine(sync: sync)),
               ),
-              if (sync.value != null && !sync.value!.connected && !kMockHealth)
+              if (!kIsWeb &&
+                  sync.value != null &&
+                  !sync.value!.connected &&
+                  !kMockHealth)
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
                   sliver: SliverToBoxAdapter(
@@ -93,8 +97,64 @@ class HomeScreen extends ConsumerWidget {
               ),
             ],
           ),
+        );
+
+    return Scaffold(
+      body: SafeArea(
+        child: isWide
+            ? Row(
+                children: [
+                  _SideNav(),
+                  const VerticalDivider(width: 1, thickness: .5),
+                  Expanded(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1080),
+                        child: content,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            : content,
+      ),
+    );
+  }
+}
+
+/// Sidebar navigation shown on wide (web/tablet) layouts.
+class _SideNav extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return NavigationRail(
+      selectedIndex: 0,
+      labelType: NavigationRailLabelType.all,
+      leading: Padding(
+        padding: const EdgeInsets.only(top: 12, bottom: 20),
+        child: Container(
+          width: 44,
+          height: 44,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: AppColors.brandGradient,
+          ),
+          child:
+              const Icon(Icons.favorite_rounded, color: Colors.white, size: 22),
         ),
       ),
+      destinations: const [
+        NavigationRailDestination(
+          icon: Icon(Icons.dashboard_rounded),
+          label: Text('Dashboard'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.settings_rounded),
+          label: Text('Settings'),
+        ),
+      ],
+      onDestinationSelected: (i) {
+        if (i == 1) context.push(Routes.settings);
+      },
     );
   }
 }
@@ -221,25 +281,29 @@ class _DashboardBody extends ConsumerWidget {
                   onTap: () => context.push('/metric/steps'),
                 ).animate().fadeIn(duration: 400.ms).slideY(begin: .06),
           const SizedBox(height: 16),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: EdgeInsets.zero,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 14,
-              crossAxisSpacing: 14,
-              childAspectRatio: 1.08,
+          LayoutBuilder(
+            builder: (context, constraints) => GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: constraints.maxWidth >= 980
+                    ? 4
+                    : (constraints.maxWidth >= 660 ? 3 : 2),
+                mainAxisSpacing: 14,
+                crossAxisSpacing: 14,
+                childAspectRatio: 1.08,
+              ),
+              itemCount: cards.length,
+              itemBuilder: (context, i) {
+                final card = cards[i];
+                if (reduceMotion) return card;
+                return card
+                    .animate(delay: (80 + 70 * i).ms)
+                    .fadeIn(duration: 380.ms)
+                    .slideY(begin: .1, curve: Curves.easeOutCubic);
+              },
             ),
-            itemCount: cards.length,
-            itemBuilder: (context, i) {
-              final card = cards[i];
-              if (reduceMotion) return card;
-              return card
-                  .animate(delay: (80 + 70 * i).ms)
-                  .fadeIn(duration: 380.ms)
-                  .slideY(begin: .1, curve: Curves.easeOutCubic);
-            },
           ),
         ]),
       ),
@@ -286,19 +350,21 @@ class _SyncStatusLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final s = sync.value;
-    final text = switch (s) {
-      null => 'Checking health data…',
-      SyncState(connected: false) => 'Health data not connected',
-      SyncState(lastSyncedAt: null) => 'Connected — pull down to sync',
-      SyncState(:final lastSyncedAt?, :final lastSampleCount) =>
-        'Synced ${DateFormat.Hm().format(lastSyncedAt)} · '
-            '$lastSampleCount samples · pull to refresh',
-    };
+    final text = kIsWeb
+        ? 'Live from your database — your phone keeps it synced'
+        : switch (s) {
+            null => 'Checking health data…',
+            SyncState(connected: false) => 'Health data not connected',
+            SyncState(lastSyncedAt: null) => 'Connected — pull down to sync',
+            SyncState(:final lastSyncedAt?, :final lastSampleCount) =>
+              'Synced ${DateFormat.Hm().format(lastSyncedAt)} · '
+                  '$lastSampleCount samples · pull to refresh',
+          };
     return Row(
       children: [
         Icon(Icons.sync_rounded,
             size: 16,
-            color: (s?.connected ?? false)
+            color: kIsWeb || (s?.connected ?? false)
                 ? AppColors.teal
                 : theme.colorScheme.onSurface.withValues(alpha: .4)),
         const SizedBox(width: 8),

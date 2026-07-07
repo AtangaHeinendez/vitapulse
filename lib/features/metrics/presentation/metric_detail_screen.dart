@@ -95,7 +95,10 @@ class _MetricDetailScreenState extends ConsumerState<MetricDetailScreen> {
               icon: const Icon(Icons.add_rounded),
               label: const Text('Add'),
             ),
-      body: ListView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 96),
         children: [
           Center(
@@ -156,6 +159,8 @@ class _MetricDetailScreenState extends ConsumerState<MetricDetailScreen> {
             ),
           ),
         ],
+          ),
+        ),
       ),
     );
   }

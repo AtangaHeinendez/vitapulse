@@ -171,6 +171,28 @@ class HealthConnectSource implements HealthSource {
   }
 }
 
+/// Inert source for platforms without Health Connect (web): the web
+/// dashboard only reads what the phone already synced to Supabase.
+class NullHealthSource implements HealthSource {
+  @override
+  Future<bool> isAvailable() async => false;
+
+  @override
+  Future<bool> hasPermissions() async => false;
+
+  @override
+  Future<bool> requestPermissions() async => false;
+
+  @override
+  Future<List<MetricSample>> fetchSamples({int days = 30}) async => const [];
+
+  @override
+  Future<int?> fallbackTodaySteps() async => null;
+
+  @override
+  Future<void> writeWater(double ml, DateTime at) async {}
+}
+
 /// Deterministic fake data for emulators/web so UI work can proceed without
 /// a watch. Enabled with --dart-define=MOCK_HEALTH=true.
 class MockHealthSource implements HealthSource {

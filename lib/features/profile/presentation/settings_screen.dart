@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -157,15 +158,18 @@ class SettingsScreen extends ConsumerWidget {
                         },
                       ),
             ),
-            const Divider(height: 1, indent: 56),
-            ListTile(
-              leading: Icon(Icons.notifications_active_rounded,
-                  color: AppColors.calories),
-              title: const Text('Reminders'),
-              subtitle: const Text('Water and blood pressure'),
-              trailing: const Icon(Icons.chevron_right_rounded),
-              onTap: () => context.push(Routes.reminders),
-            ),
+            // Local notification reminders are a phone-only feature.
+            if (!kIsWeb) ...[
+              const Divider(height: 1, indent: 56),
+              ListTile(
+                leading: Icon(Icons.notifications_active_rounded,
+                    color: AppColors.calories),
+                title: const Text('Reminders'),
+                subtitle: const Text('Water and blood pressure'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => context.push(Routes.reminders),
+              ),
+            ],
           ]),
           const SizedBox(height: 14),
           section([
