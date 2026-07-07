@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:vitapulse/core/services/prefs_service.dart';
 import 'package:vitapulse/features/auth/application/auth_providers.dart';
 import 'package:vitapulse/features/auth/presentation/sign_in_screen.dart';
+import 'package:vitapulse/features/metrics/application/sync_providers.dart';
+import 'package:vitapulse/features/metrics/data/health_source.dart';
 import 'package:vitapulse/features/onboarding/presentation/onboarding_screen.dart';
 import 'package:vitapulse/features/profile/application/profile_providers.dart';
 import 'package:vitapulse/main.dart';
@@ -14,6 +16,7 @@ import 'fakes.dart';
 Future<Widget> appWithFakes({
   FakeAuthRepository? auth,
   FakeProfileRepository? profiles,
+  FakeMetricsRepository? metrics,
 }) async {
   final prefs = await SharedPreferences.getInstance();
   return ProviderScope(
@@ -22,6 +25,9 @@ Future<Widget> appWithFakes({
       authRepositoryProvider.overrideWithValue(auth ?? FakeAuthRepository()),
       profileRepositoryProvider
           .overrideWithValue(profiles ?? FakeProfileRepository()),
+      metricsRepositoryProvider
+          .overrideWithValue(metrics ?? FakeMetricsRepository()),
+      healthSourceProvider.overrideWithValue(MockHealthSource()),
     ],
     child: const VitaPulseApp(),
   );

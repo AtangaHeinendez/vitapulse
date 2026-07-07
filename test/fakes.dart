@@ -2,6 +2,9 @@ import 'dart:async';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vitapulse/features/auth/data/auth_repository.dart';
+import 'package:vitapulse/features/metrics/data/metrics_repository.dart';
+import 'package:vitapulse/features/metrics/domain/metric_sample.dart';
+import 'package:vitapulse/features/metrics/domain/metric_type.dart';
 import 'package:vitapulse/features/profile/data/profile_repository.dart';
 import 'package:vitapulse/features/profile/domain/profile.dart';
 
@@ -79,6 +82,49 @@ class FakeAuthRepository implements AuthRepository {
 
   @override
   Future<void> updatePassword(String newPassword) async {}
+}
+
+class FakeMetricsRepository implements MetricsRepository {
+  final samples = <MetricSample>[];
+  final recomputedDays = <DateTime>{};
+
+  @override
+  Future<void> upsertSamples(String userId, List<MetricSample> s) async {
+    samples.addAll(s);
+  }
+
+  @override
+  Future<void> recomputeDailySummaries(
+      Set<DateTime> days, int utcOffsetMinutes) async {
+    recomputedDays.addAll(days);
+  }
+
+  @override
+  Future<List<MetricSample>> latestOfEachType(String userId) async {
+    final seen = <MetricType>{};
+    final sorted = [...samples]
+      ..sort((a, b) => b.recordedAt.compareTo(a.recordedAt));
+    return [
+      for (final s in sorted)
+        if (seen.add(s.type)) s,
+    ];
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> dailySummaries(String userId,
+          {int days = 30}) async =>
+      const [];
+
+  @override
+  Future<List<MetricSample>> history(String userId, MetricType type,
+          {required DateTime from, required DateTime to}) async =>
+      [
+        for (final s in samples)
+          if (s.type == type &&
+              !s.recordedAt.isBefore(from) &&
+              !s.recordedAt.isAfter(to))
+            s,
+      ];
 }
 
 class FakeProfileRepository implements ProfileRepository {
