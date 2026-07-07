@@ -51,3 +51,6 @@ key.properties
 *.jks
 google-services.json
 firebase-service-account*.json
+
+# Gradle-side build output (root /build/ is the redirected main one)
+/android/build/
