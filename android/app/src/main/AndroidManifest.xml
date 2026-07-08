@@ -1,4 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required for Supabase (and any network) access in release builds;
+         debug builds inject it automatically, release builds do not. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <!-- Health Connect read permissions (per health package README). -->
     <uses-permission android:name="android.permission.health.READ_STEPS"/>
     <uses-permission android:name="android.permission.health.READ_HEART_RATE"/>
