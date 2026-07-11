@@ -30,6 +30,13 @@ lib/
 - `core/router/app_router.dart` — all routes in `Routes`; fade page transitions
 - Brand assets in `assets/branding/` are **generated** by a GDI+ PowerShell script (heart + ECG mark); Lottie intro in `assets/lottie/pulse.json` (hand-authored JSON)
 
+## Workflow rules
+
+- **Never commit directly to `main`.**
+- Every task gets its own feature branch, clear commit messages, and a PR opened via the `gh` CLI.
+- After opening a PR, wait ~2 min for CodeRabbit's review, fetch its comments (`gh api repos/{owner}/{repo}/pulls/{n}/comments` + issue comments), and fix anything actionable before asking the user to merge.
+- Keep PRs small — one feature or fix per PR.
+
 ## Conventions
 
 - Conventional commits (`feat:`, `fix:`, `chore:`), small commits per feature

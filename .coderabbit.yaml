@@ -1,0 +1,38 @@
+# CodeRabbit configuration for VitaPulse (Flutter + Supabase)
+# Save this file as `.coderabbit.yaml` (note the leading dot) in the repo root.
+
+language: "en-US"
+
+reviews:
+  profile: "chill"
+  high_level_summary: true
+  poem: false
+  collapse_walkthrough: true
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    # Skip generated/vendor files to save your free-tier rate limits
+    - "!**/*.g.dart"
+    - "!**/*.freezed.dart"
+    - "!**/generated/**"
+    - "!android/**/build/**"
+    - "!ios/Pods/**"
+    - "!**/*.lock"
+  path_instructions:
+    - path: "lib/**/*.dart"
+      instructions: |
+        Review Flutter/Dart code for: null-safety issues, missing error
+        handling around Supabase calls, widgets rebuilding unnecessarily,
+        hardcoded secrets or API keys, and missed const constructors.
+        Flag any network call without a timeout or offline fallback,
+        since this app targets users on mobile data in Cameroon.
+    - path: "supabase/functions/**"
+      instructions: |
+        These are Supabase Edge Functions (Deno/TypeScript). Verify webhook
+        signature validation (especially Flutterwave verif-hash), strict
+        input validation, and that service-role keys are never exposed
+        client-side.
+
+chat:
+  auto_reply: true
