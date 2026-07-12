@@ -13,6 +13,7 @@ import '../../features/metrics/presentation/metric_detail_screen.dart';
 import '../../features/onboarding/presentation/intro_screen.dart';
 import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/profile/application/profile_providers.dart';
+import '../../features/profile/domain/profile.dart';
 import '../../features/profile/presentation/profile_setup_screen.dart';
 import '../../features/profile/presentation/settings_screen.dart';
 import '../../features/reminders/presentation/reminders_screen.dart';
@@ -60,7 +61,18 @@ final routerProvider = Provider<GoRouter>((ref) {
       // recovery deep link.
       if (loc == Routes.resetPassword) return null;
 
-      final profile = await ref.read(currentProfileProvider.future);
+      // On flaky mobile data the profile fetch can stall behind a hanging
+      // auth-session refresh; never strand the user on the intro screen.
+      // When the profile can't be determined in time, proceed to the
+      // requested destination — the dashboard has its own loading states.
+      final Profile? profile;
+      try {
+        profile = await ref
+            .read(currentProfileProvider.future)
+            .timeout(const Duration(seconds: 8));
+      } catch (_) {
+        return inAuthFlow || loc == Routes.intro ? Routes.home : null;
+      }
       final needsSetup = profile == null || !profile.isComplete;
       if (needsSetup) {
         return loc == Routes.profileSetup ? null : Routes.profileSetup;
