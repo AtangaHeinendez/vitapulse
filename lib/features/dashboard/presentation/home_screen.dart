@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -90,7 +92,28 @@ class HomeScreen extends ConsumerWidget {
                 error: (e, _) => SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
-                    child: Text('Could not load your dashboard: $e'),
+                    child: Column(
+                      children: [
+                        Icon(Icons.wifi_off_rounded,
+                            size: 40,
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: .35)),
+                        const SizedBox(height: 12),
+                        Text(
+                          e is TimeoutException
+                              ? 'The connection is slow right now — your data '
+                                  'is safe. Pull down to try again.'
+                              : 'Could not load your dashboard. Pull down to '
+                                  'try again.\n($e)',
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurface
+                                .withValues(alpha: .6),
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 data: (d) => _DashboardBody(data: d),
