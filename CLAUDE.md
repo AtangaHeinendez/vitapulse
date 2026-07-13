@@ -63,6 +63,13 @@ flutter build web --release                             # web bundle (deployed t
 2. **AF_UNIX `connect` is broken on this Windows build** (26200.8737) — every JDK ≥16 `Selector.open()` dies, killing Gradle ("Unable to establish loopback connection"). Fixed via user env var `JAVA_TOOL_OPTIONS=-Djdk.net.unixdomain.tmpdir=<path longer than 108 bytes>` which forces the JDK's TCP-loopback pipe fallback. Delete the env var if a Windows update fixes AF_UNIX.
 3. **NDK pinned to 29.0.14206865** (root + app build.gradle.kts) because it's already installed; `flutter.ndkVersion` (28.2) triggers a multi-GB download that keeps failing on this connection. Don't "clean up" the pin.
 
+## Device & pipeline verification (2026-07-13, Galaxy phone via wireless adb)
+
+- **Health Connect accuracy — verified end-to-end.** Steps matched Samsung Health exactly (single data origin: Samsung Health dedupes watch+phone before writing to HC, so no double-counting). Sleep (3h30m session) and SpO₂ (95%) verified matching by the user after enabling Samsung Health's **write** sync. Learnings: HC "App access" READ toggles are not enough — Samsung Health's own sync list / HC **"Allowed to write"** section controls what it exports; Samsung Health does **not backfill** pre-existing data (only sessions recorded after enabling sync); sleep/SpO₂ sync after the next completed sleep.
+- **Bugs found on-device and fixed:** release builds missing INTERNET permission (debug injects it — emulator testing never caught it); cold-start hang when a Supabase session refresh stalls on mobile data (router redirect now times out at 8s; repository reads 15s); HR-card sparkline overflow (4.9px) on Galaxy text metrics; raw TimeoutException shown to users (now a friendly pull-to-refresh hint).
+- **CI:** web build OOM'd (`dart2js` SIGTERM at -O4) on 7 GB private-repo runners — root cause of the "operation was canceled" failure, NOT billing. Fixed by repo going public (16 GB standard runners) + workflow split into independent `build-and-distribute` and `deploy-web` jobs with timeouts and Gradle caching. If the repo ever goes private again, expect the web job to OOM: build with `-O2` or use a larger runner.
+- **Workflow:** all changes now flow through feature branches + PRs with CodeRabbit review (config in `.coderabbit.yaml`); three PRs merged clean through this process.
+
 ## Status / decisions log
 
 - Phase 0: env audit clean (Flutter 3.44.5, Android SDK 36.1). gh/firebase/vercel CLIs deferred to Phases 5–6.
