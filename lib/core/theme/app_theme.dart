@@ -6,9 +6,14 @@ import 'app_colors.dart';
 /// Material 3 themes: Outfit for headings/numbers, Inter for body text,
 /// rounded cards with soft shadows, light + dark.
 abstract final class AppTheme {
-  static ThemeData light() => _build(Brightness.light);
+  // Built once — ThemeData construction (incl. google_fonts text themes)
+  // is not free and VitaPulseApp rebuilds on every auth state change.
+  static final ThemeData _light = _build(Brightness.light);
+  static final ThemeData _dark = _build(Brightness.dark);
 
-  static ThemeData dark() => _build(Brightness.dark);
+  static ThemeData light() => _light;
+
+  static ThemeData dark() => _dark;
 
   static ThemeData _build(Brightness brightness) {
     final isLight = brightness == Brightness.light;

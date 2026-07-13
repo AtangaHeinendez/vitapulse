@@ -24,6 +24,10 @@ class SupabaseMetricsRepository implements MetricsRepository {
 
   static const _batchSize = 500;
 
+  /// Reads on the dashboard/detail critical path must not hang forever on
+  /// stalled mobile-data connections.
+  static const _readTimeout = Duration(seconds: 15);
+
   @override
   Future<void> upsertSamples(String userId, List<MetricSample> samples) async {
     for (var i = 0; i < samples.length; i += _batchSize) {
@@ -60,7 +64,8 @@ class SupabaseMetricsRepository implements MetricsRepository {
         .select('metric_type, value, recorded_at, source')
         .eq('user_id', userId)
         .order('recorded_at', ascending: false)
-        .limit(400);
+        .limit(400)
+        .timeout(_readTimeout);
     final seen = <String>{};
     final result = <MetricSample>[];
     for (final row in rows) {
@@ -80,7 +85,8 @@ class SupabaseMetricsRepository implements MetricsRepository {
         .select()
         .eq('user_id', userId)
         .gte('day', since.toIso8601String().substring(0, 10))
-        .order('day', ascending: true);
+        .order('day', ascending: true)
+        .timeout(_readTimeout);
   }
 
   @override
@@ -97,7 +103,8 @@ class SupabaseMetricsRepository implements MetricsRepository {
         .eq('metric_type', type.dbName)
         .gte('recorded_at', from.toUtc().toIso8601String())
         .lte('recorded_at', to.toUtc().toIso8601String())
-        .order('recorded_at', ascending: true);
+        .order('recorded_at', ascending: true)
+        .timeout(_readTimeout);
     return rows.map(MetricSample.fromRow).toList();
   }
 }

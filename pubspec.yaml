@@ -40,6 +40,9 @@ flutter:
   assets:
     - assets/lottie/
     - assets/branding/
+    # Bundled Outfit/Inter so google_fonts never fetches over the network
+    # (first run on mobile data) — the package picks these up automatically.
+    - assets/google_fonts/
 
 flutter_native_splash:
   background_image: assets/branding/splash_bg.png

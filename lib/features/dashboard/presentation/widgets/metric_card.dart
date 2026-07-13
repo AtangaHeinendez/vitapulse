@@ -65,17 +65,22 @@ class MetricCard extends StatelessWidget {
                 ?trailing,
               ],
             ),
-            const Spacer(),
-            if (sparkline != null && sparkline!.length >= 2) ...[
-              SizedBox(
-                height: 26,
-                width: double.infinity,
-                child: CustomPaint(
-                  painter: _SparklinePainter(sparkline!, accent),
+            // Fills whatever vertical space the card has left, so varying
+            // device text metrics can never overflow the fixed-ratio cell.
+            if (sparkline != null && sparkline!.length >= 2)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 8, bottom: 6),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: CustomPaint(
+                      painter: _SparklinePainter(sparkline!, accent),
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 6),
-            ],
+              )
+            else
+              const Spacer(),
             Text.rich(
               TextSpan(
                 text: value,

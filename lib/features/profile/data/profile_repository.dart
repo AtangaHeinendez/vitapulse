@@ -15,10 +15,18 @@ class SupabaseProfileRepository implements ProfileRepository {
 
   final SupabaseClient _client;
 
+  /// Guards every read against stalled connections (flaky mobile data);
+  /// callers see a TimeoutException instead of hanging forever.
+  static const _readTimeout = Duration(seconds: 15);
+
   @override
   Future<Profile?> fetch(String userId) async {
-    final data =
-        await _client.from('profiles').select().eq('id', userId).maybeSingle();
+    final data = await _client
+        .from('profiles')
+        .select()
+        .eq('id', userId)
+        .maybeSingle()
+        .timeout(_readTimeout);
     return data == null ? null : Profile.fromJson(data);
   }
 
